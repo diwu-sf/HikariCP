@@ -340,7 +340,9 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
    @Override
    public void addBagItem(final int waiting)
    {
-      if (waiting > addConnectionExecutor.getQueue().size())
+      // Waiter counts are snapshots and callbacks can arrive out of order. Let the
+      // bounded executor queue and PoolEntryCreator limit connection creation.
+      if (waiting > 0)
          addConnectionExecutor.submit(poolEntryCreator);
    }
 
