@@ -40,7 +40,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.spy;
 
-public class ConnectionLifecycleAuditTest
+public class ConnectionLifecycleRaceTest
 {
    @Test
    public void healthyReturnWakesExistingWaiter() throws Exception
