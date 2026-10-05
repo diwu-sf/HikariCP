@@ -460,6 +460,10 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
    {
       if (connectionBag.remove(poolEntry)) {
          final var connection = poolEntry.close();
+         // A creator may have exited while this connection still occupied a slot.
+         if (poolState == POOL_NORMAL) {
+            addBagItem(connectionBag.getWaitingThreadCount());
+         }
          closeConnectionExecutor.execute(() -> {
             quietlyCloseConnection(connection, closureReason);
             if (poolState == POOL_NORMAL) {
@@ -863,9 +867,7 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
 
       public void run()
       {
-         if (softEvictConnection(poolEntry, "(connection has passed maxLifetime)", false /* not owner */)) {
-            addBagItem(connectionBag.getWaitingThreadCount());
-         }
+         softEvictConnection(poolEntry, "(connection has passed maxLifetime)", false /* not owner */);
       }
    }
 
@@ -883,7 +885,6 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
          if (connectionBag.reserve(poolEntry)) {
             if (isConnectionDead(poolEntry.connection)) {
                softEvictConnection(poolEntry, DEAD_CONNECTION_MESSAGE, true);
-               addBagItem(connectionBag.getWaitingThreadCount());
             }
             else {
                connectionBag.unreserve(poolEntry);
