@@ -627,17 +627,13 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
     * @param poolEntry the PoolEntry (/Connection) to "soft" evict from the pool
     * @param reason the reason that the connection is being evicted
     * @param owner true if the caller is the owner of the connection, false otherwise
-    * @return true if the connection was evicted (closed), false if it was merely marked for eviction
     */
-   private boolean softEvictConnection(final PoolEntry poolEntry, final String reason, final boolean owner)
+   private void softEvictConnection(final PoolEntry poolEntry, final String reason, final boolean owner)
    {
       poolEntry.markEvicted();
       if (owner || connectionBag.reserve(poolEntry)) {
          closeConnection(poolEntry, reason);
-         return true;
       }
-
-      return false;
    }
 
    /**
