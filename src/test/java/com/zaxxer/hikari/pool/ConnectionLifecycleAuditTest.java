@@ -183,6 +183,41 @@ public class ConnectionLifecycleAuditTest
    }
 
    @Test
+   public void idleTimeoutMustRecheckAgeAfterReservation() throws Exception
+   {
+      final var workers = Executors.newSingleThreadExecutor();
+      final var reserving = new CountDownLatch(1);
+      final var allowReserve = new CountDownLatch(1);
+      try (HikariDataSource ds = dataSource(0, 1)) {
+         try (Connection initial = ds.getConnection()) {}
+         final var bag = installSpy(ds);
+         final var entry = bag.values().get(0);
+         entry.lastAccessed = plusMillis(currentTime(), -20_000);
+         doAnswer(invocation -> {
+            reserving.countDown();
+            await(allowReserve);
+            return invocation.callRealMethod();
+         }).when(bag).reserve(any(PoolEntry.class));
+
+         final var cleanup = workers.submit(houseKeeper(ds));
+         await(reserving);
+         try (Connection used = ds.getConnection()) {
+            assertSame(entry.connection, used.unwrap(Connection.class));
+         }
+         assertTrue(elapsedMillis(entry.lastAccessed) < ds.getIdleTimeout());
+         allowReserve.countDown();
+         cleanup.get(5, SECONDS);
+         drainExecutor(ds, "closeConnectionExecutor");
+         assertEquals("Recently returned connection was retired before idleTimeout", 1, getPool(ds).getTotalConnections());
+      }
+      finally {
+         allowReserve.countDown();
+         workers.shutdownNow();
+         assertTrue(workers.awaitTermination(5, SECONDS));
+      }
+   }
+
+   @Test
    public void ordinaryIdleCleanupStopsAtMinimumIdle() throws Exception
    {
       try (HikariDataSource ds = dataSource(1, 3)) {

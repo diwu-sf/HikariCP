@@ -839,8 +839,14 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
                var maxToRemove = notInUse.size() - config.getMinimumIdle();
                for (PoolEntry entry : notInUse) {
                   if (maxToRemove > 0 && elapsedMillis(entry.lastAccessed, now) > idleTimeout && connectionBag.reserve(entry)) {
-                     closeConnection(entry, "(connection has passed idleTimeout)");
-                     maxToRemove--;
+                     // The connection may have been borrowed and returned before reservation.
+                     if (elapsedMillis(entry.lastAccessed, now) > idleTimeout) {
+                        closeConnection(entry, "(connection has passed idleTimeout)");
+                        maxToRemove--;
+                     }
+                     else {
+                        connectionBag.unreserve(entry);
+                     }
                   }
                }
                logPoolState("After  cleanup ");
